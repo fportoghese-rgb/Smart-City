@@ -5,9 +5,10 @@ from datetime import datetime
 from kafka import KafkaProducer
 
 # Configurazione del Producer
-# Si collega a localhost:9092 perché Kafka ha la porta esposta sul tuo PC
+
 producer = KafkaProducer(
     bootstrap_servers=['localhost:9092'],
+    api_version=(0, 10, 2), 
     value_serializer=lambda v: json.dumps(v).encode('utf-8')
 )
 
