@@ -1,49 +1,59 @@
 import json
 import time
-import random
+import requests
 from datetime import datetime
 from kafka import KafkaProducer
 
-# Configurazione del Producer
+
+BOOTSTRAP_SERVERS = ['localhost:9092'] 
+TOPIC = 'city-sensors'
+API_KEY = "c5f9e150199f56d96cd24c9994b6c931" 
 
 producer = KafkaProducer(
-    bootstrap_servers=['localhost:9092'],
-    api_version=(0, 10, 2), 
+    bootstrap_servers=BOOTSTRAP_SERVERS,
     value_serializer=lambda v: json.dumps(v).encode('utf-8')
 )
 
-TOPIC = 'city-sensors'
+def get_pollution_data(lat, lon, zone_name, sensor_id):
+    url = f"http://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={API_KEY}" #fondamentale per andare al mio account openwhteher
+    
+  
+    response = requests.get(url, timeout=5)
+    
+    response.raise_for_status() 
+    
+    data = response.json()
+  
+    pm10 = data['list'][0]['components']['pm10']
+    
+    
+    aqi = data['list'][0]['main']['aqi']
 
-# Sensori posizionati in punti strategici
+    return {
+        "sensor_id": sensor_id,
+        "zone": zone_name,
+        "lat": lat, 
+        "lon": lon,
+        "pm10": pm10,
+        "aqi": aqi, # 1=Buono, 5=Pessimo
+        "timestamp": datetime.now().isoformat()
+    }
+
 sensors = [
-    {"id": "S-01", "zone": "Duomo", "lat": 45.4642, "lon": 9.1900},
-    {"id": "S-02", "zone": "Navigli", "lat": 45.4520, "lon": 9.1760},
-    {"id": "S-03", "zone": "Brera", "lat": 45.4710, "lon": 9.1870},
-    {"id": "S-04", "zone": "Isola", "lat": 45.4860, "lon": 9.1860}
-]
+    {"id": "S-01", "zone": "Milano", "lat": 45.4642, "lon": 9.1900},
+    {"id": "S-02", "zone": "Pechino", "lat": 39.9042, "lon": 116.4074}
+] # questo serve per dire, prendi l'aria di queste zone del mondo e dimmi come è 
 
-print(f"🚀 Simulatore avviato! Invio dati al topic '{TOPIC}'...")
+print(f"🚀 Avvio monitoraggio REALE su topic: {TOPIC}")
 
 try:
     while True:
         for s in sensors:
-            # Generiamo dati realistici ma casuali
-            payload = {
-                "sensor_id": s["id"],
-                "zone": s["zone"],
-                "lat": s["lat"],
-                "lon": s["lon"],
-                "cars_count": random.randint(5, 120),  # Numero di auto
-                "pm10": round(random.uniform(15.0, 95.0), 2), # Livello inquinamento
-                "timestamp": datetime.now().isoformat()
-            }
-            
-            # Invio a Kafka
+            payload = get_pollution_data(s['lat'], s['lon'], s['zone'], s['id'])
             producer.send(TOPIC, value=payload)
-            print(f"📡 Inviato da {s['zone']}: {payload['cars_count']} auto, PM10: {payload['pm10']}")
-            
-        time.sleep(3) # Aspettiamo 3 secondi prima del prossimo invio
-except KeyboardInterrupt:
-    print("\n🛑 Simulatore fermato.")
-finally:
-    producer.close()
+            print(f" DATO REALE RICEVUTO: {payload['zone']} -> PM10: {payload['pm10']} (AQI: {payload['aqi']})")
+        
+        print("-" * 30)
+        time.sleep(10) # OpenWeather aggiorna i dati ogni ora circa, quindi 10s o 60s va bene
+except Exception as e:
+    print(f" ERRORE: Non riesco a prendere i dati reali. Dettaglio: {e}")
