@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - tap
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.0
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+    networks:
+      - tap
+
+  spark:
+    image: apache/spark-py:latest
+    user: root
+    container_name: smartcity-spark-1
+    restart: on-failure # Riavvia se fallisce
+    environment:
+      - SPARK_MODE=master
+    ports:
+      - "8080:8080"
+      - "4040:4040"
+    volumes:
+      - ./spark/code:/opt/spark/work-dir/code
+      - ./spark/model:/opt/spark/smart_city_model
+      - ./spark/data:/tmp/data
+      - ./spark/checkpoint:/tmp/checkpoint
+    # Entrypoint che installa numpy e poi lancia lo script
+    entrypoint: >
+      /bin/bash -c "
+      pip install --no-cache-dir numpy && 
+      /opt/spark/bin/spark-submit 
+      --master local[*] 
+      --conf spark.sql.streaming.checkpointLocation=/tmp/checkpoint 
+      --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0 
+      /opt/spark/work-dir/code/spark_analyzer.py"
+    depends_on:
+      - kafka
+      - elasticsearch
+    networks:
+      - tap
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.9
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    networks:
+      - tap
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.17.9
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline
+    depends_on:
+      - elasticsearch
+      - kafka
+    networks:
+      - tap
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.17.9
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - tap
+
+  producer:
+    image: python:3.9-slim
+    container_name: smartcity-producer
+    restart: on-failure
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    volumes:
+      - ./producer.py:/app/producer.py
+      - ./spark/data:/app/spark/data
+    working_dir: /app
+    entrypoint: >
+      /bin/bash -c "
+      pip install --no-cache-dir requests kafka-python && 
+      python -u producer.py"
+    depends_on:
+      - kafka
+    networks:
+      - tap
+
+networks:
+  tap:
+    name: tap
