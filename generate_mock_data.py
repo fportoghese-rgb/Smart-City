@@ -1,6 +1,7 @@
 import csv
 import random
 import os
+from datetime import datetime, timedelta
 
 CSV_PATH = "spark/data/history.csv"
 
@@ -13,7 +14,7 @@ base_data = [
 ]
 
 columns = [
-    'pm10', 'temp', 'hum', 'wind_speed', 'rain', 
+    'timestamp', 'pm10', 'temp', 'hum', 'wind_speed', 'rain', 
     'pressure', 'hour', 'day_of_week', 'is_weekend', 'label'
 ]
 
@@ -24,7 +25,10 @@ with open(CSV_PATH, mode='w', newline='') as f:
     writer.writeheader()
     
 
+    current_time = datetime.now() - timedelta(hours=1000)
+
     for _ in range(1000):
+        ts_str = current_time.isoformat()
         for base in base_data:
             
             pm10 = max(0.1, base["pm10"] + random.uniform(-5.0, 5.0))
@@ -52,6 +56,7 @@ with open(CSV_PATH, mode='w', newline='') as f:
             if hum > 75: target_pm10 *= 1.1
             
             row = {
+                'timestamp': ts_str,
                 'pm10': round(pm10, 2),
                 'temp': round(temp, 2),
                 'hum': int(hum),
@@ -64,5 +69,7 @@ with open(CSV_PATH, mode='w', newline='') as f:
                 'label': round(target_pm10, 2)
             }
             writer.writerow(row)
+            
+        current_time += timedelta(hours=1)
 
 print(f"✅ Generati con successo 4000 record coerenti in {CSV_PATH}")

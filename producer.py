@@ -22,7 +22,7 @@ def save_to_history(data):
     """Salva i dati nel CSV per il training futuro del modello Spark ML"""
     file_exists = os.path.isfile(CSV_PATH)
     columns = [
-        'pm10', 'temp', 'hum', 'wind_speed', 'rain', 
+        'timestamp', 'pm10', 'temp', 'hum', 'wind_speed', 'rain', 
         'pressure', 'hour', 'day_of_week', 'is_weekend', 'label'
     ]
     
@@ -45,6 +45,7 @@ def save_to_history(data):
         if hum > 75: target_pm10 *= 1.1
 
         row = {
+            'timestamp': data.get('timestamp'),
             'pm10': pm10,
             'temp': data.get('temp', 20),
             'hum': hum,

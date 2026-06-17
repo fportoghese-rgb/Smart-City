@@ -65,14 +65,14 @@ for i, city in enumerate(cities):
             {
                 "id": "1",
                 "enabled": True,
-                "type": "avg",
+                "type": "max",
                 "schema": "metric",
                 "params": {"field": "predicted_pm10"}
             },
             {
                 "id": "3",
                 "enabled": True,
-                "type": "avg",
+                "type": "max",
                 "schema": "metric",
                 "params": {"field": "pm10"}
             },
@@ -84,8 +84,8 @@ for i, city in enumerate(cities):
                 "params": {
                     "field": "@timestamp",
                     "timeRange": "",
-                    "useNormalizedEsInterval": True,
-                    "interval": "auto",
+                    "useNormalizedEsInterval": False,
+                    "interval": "1h",
                     "drop_partials": False,
                     "min_doc_count": 1,
                     "extended_bounds": {}
@@ -162,7 +162,7 @@ dashboard_obj = {
         "version": 1,
         "timeRestore": True,
         "timeTo": "now",
-        "timeFrom": "now-24h",
+        "timeFrom": "now-1000h",
         "kibanaSavedObjectMeta": {
             "searchSourceJSON": json.dumps(dashboard_search_source)
         }
